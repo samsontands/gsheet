@@ -2,15 +2,15 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
-from google.oauth2.service_account import Credentials
 
-
-def setup_credentials():
+# Set up Google Sheets credentials
+@st.cache_resource
+def get_gspread_client():
     credentials = Credentials.from_service_account_info(
         st.secrets["gcp_service_account"],
         scopes=[
-            'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive'
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
         ]
     )
     return gspread.authorize(credentials)
@@ -26,6 +26,7 @@ def create_sheet_if_not_exists(client, sheet_name):
     return sheet
 
 # Load data from the sheet
+@st.cache_data
 def load_sheet_data(sheet):
     worksheet = sheet.sheet1
     data = worksheet.get_all_values()
@@ -42,14 +43,20 @@ def save_sheet_data(sheet, df):
 def main():
     st.title("Google Sheets Editor")
 
-    client = setup_credentials()
+    client = get_gspread_client()
     sheet_name = "StreamlitPOC"
     sheet = create_sheet_if_not_exists(client, sheet_name)
+
+    # Display sheet information
+    st.subheader("Sheet Information")
+    st.write(f"Sheet Name: {sheet.title}")
+    st.write(f"Sheet URL: {sheet.url}")
+    st.write("You can access this sheet in your Google Drive.")
 
     df = load_sheet_data(sheet)
 
     # Display the dataframe
-    st.write("Current data:")
+    st.subheader("Current data:")
     st.dataframe(df)
 
     # Add new row
@@ -63,22 +70,20 @@ def main():
         df = pd.concat([df, new_row], ignore_index=True)
         save_sheet_data(sheet, df)
         st.success("Row added successfully!")
+        st.experimental_rerun()
 
     # Edit existing rows
     st.subheader("Edit existing rows")
-    row_index = st.number_input("Row index to edit", min_value=0, max_value=len(df)-1)
-    col_name = st.selectbox("Column to edit", df.columns)
-    new_value = st.text_input("New value")
+    row_index = st.number_input("Row index to edit", min_value=0, max_value=len(df)-1 if not df.empty else 0)
+    if not df.empty:
+        col_name = st.selectbox("Column to edit", df.columns)
+        new_value = st.text_input("New value")
 
-    if st.button("Update Cell"):
-        df.at[row_index, col_name] = new_value
-        save_sheet_data(sheet, df)
-        st.success("Cell updated successfully!")
-
-    # Refresh data
-    if st.button("Refresh Data"):
-        df = load_sheet_data(sheet)
-        st.dataframe(df)
+        if st.button("Update Cell"):
+            df.at[row_index, col_name] = new_value
+            save_sheet_data(sheet, df)
+            st.success("Cell updated successfully!")
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     main()
