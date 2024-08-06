@@ -15,48 +15,35 @@ def get_gspread_client():
     )
     return gspread.authorize(credentials)
 
-# Create a new sheet if it doesn't exist
-def create_sheet_if_not_exists(client, sheet_name):
-    try:
-        sheet = client.open(sheet_name)
-    except gspread.SpreadsheetNotFound:
-        sheet = client.create(sheet_name)
-        worksheet = sheet.sheet1
-        worksheet.append_row(['Name', 'Age', 'City'])  # Add headers
-    return sheet
-
 # Load data from the sheet
 @st.cache_data
 def load_sheet_data(sheet):
-    worksheet = sheet.sheet1
-    data = worksheet.get_all_values()
+    data = sheet.get_all_values()
     headers = data.pop(0)
     return pd.DataFrame(data, columns=headers)
 
 # Save data back to the sheet
 def save_sheet_data(sheet, df):
-    worksheet = sheet.sheet1
-    worksheet.clear()
-    worksheet.update([df.columns.values.tolist()] + df.values.tolist())
+    sheet.clear()
+    sheet.update([df.columns.values.tolist()] + df.values.tolist())
 
 # Streamlit app
 def main():
     st.title("Google Sheets Editor")
 
+    # Replace this with your actual Google Sheet ID
+    SHEET_ID = "your_sheet_id_here"
+    
     client = get_gspread_client()
-    sheet_name = "StreamlitPOC"
-    sheet = create_sheet_if_not_exists(client, sheet_name)
+    sheet = client.open_by_key(SHEET_ID).sheet1
 
-    # Display sheet information
-    st.subheader("Sheet Information")
-    st.write(f"Sheet Name: {sheet.title}")
-    st.write(f"Sheet URL: {sheet.url}")
-    st.write("You can access this sheet in your Google Drive.")
+    st.write(f"Editing sheet: {sheet.spreadsheet.title}")
+    st.write(f"Sheet URL: https://docs.google.com/spreadsheets/d/{SHEET_ID}")
 
     df = load_sheet_data(sheet)
 
     # Display the dataframe
-    st.subheader("Current data:")
+    st.write("Current data:")
     st.dataframe(df)
 
     # Add new row
